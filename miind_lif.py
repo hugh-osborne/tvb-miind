@@ -34,8 +34,10 @@ Description of models
 from .base import ModelNumbaDfun, LOG, numpy, basic, arrays
 from numba import guvectorize, float64
 
+from mpi4py import MPI
+
 import sys
-sys.path.insert(0, '/home/csunix/sc16ho/dev/miind/build/libs/PythonWrapper')
+sys.path.insert(0, '/home/hugh/dev/miind/build/libs/PythonWrapper')
 
 import libmiindpw
 
@@ -86,21 +88,20 @@ class MiindLif(ModelNumbaDfun):
     def __init__(self, num_nodes):
         self.number_of_nodes = num_nodes
         self.wrapped = libmiindpw.Wrapped()
-        for i in range(num_nodes):
-            self.wrapped.addNode()
 
     def configure(self):
         """  """
         super(MiindLif, self).configure()
         self.update_derived_parameters()
     	self.wrapped.init()
+	self.wrapped.startSimulation()
 
     def dfun(self, x, c, local_coupling=0.0):
         x_ = x.reshape(x.shape[:-1]).T
         c_ = c.reshape(c.shape[:-1]).T + local_coupling * x[0]
-
-    	self.wrapped.setPrecurserActivity([x[0] for x in c_])
         
-    	x_ = (numpy.array([[x] for x in self.wrapped.evolveSingleStep()]))
+	print [x[0] for x in c_]
+    	x_ = (numpy.array([[x] for x in self.wrapped.evolveSingleStep([x[0] for x in c_])]))
+	print x_
 
         return x_.T[..., numpy.newaxis]
