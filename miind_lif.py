@@ -37,7 +37,7 @@ from numba import guvectorize, float64
 from mpi4py import MPI
 
 import sys
-sys.path.insert(0, '/home/hugh/dev/miind/build/libs/PythonWrapper')
+sys.path.insert(0, '//home/csunix/sc16ho/dev/miind/build/libs/PythonWrapper')
 
 import libmiindpw
 
@@ -90,6 +90,8 @@ class MiindLif(ModelNumbaDfun):
         self.wrapped = libmiindpw.Wrapped()
 
     def configure(self):
+        comm = MPI.COMM_WORLD
+        print "MASTER RANK: " + str(comm.Get_rank())
         """  """
         super(MiindLif, self).configure()
         self.update_derived_parameters()
@@ -99,9 +101,7 @@ class MiindLif(ModelNumbaDfun):
     def dfun(self, x, c, local_coupling=0.0):
         x_ = x.reshape(x.shape[:-1]).T
         c_ = c.reshape(c.shape[:-1]).T + local_coupling * x[0]
-        
-	print [x[0] for x in c_]
+
     	x_ = (numpy.array([[x] for x in self.wrapped.evolveSingleStep([x[0] for x in c_])]))
-	print x_
 
         return x_.T[..., numpy.newaxis]
