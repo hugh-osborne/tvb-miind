@@ -17,17 +17,9 @@ mon_raw = monitors.Raw()
 mon_tavg = monitors.TemporalAverage(period=2**-2)
 what_to_watch = (mon_raw, mon_tavg)
 
-E_init = numpy.zeros(76)
-I_init = numpy.zeros(76)
-inits = numpy.row_stack((E_init, I_init))
-initial_conditions = numpy.expand_dims(numpy.expand_dims(inits, axis=0), axis=3)
-
-print initial_conditions.shape
-
 sim = simulator.Simulator(model = oscilator, connectivity = white_matter,
                           coupling = white_matter_coupling,
-                          integrator = heunint, monitors = what_to_watch,
-                          initial_conditions = initial_conditions)
+                          integrator = heunint, monitors = what_to_watch)
 
 sim.configure()
 

@@ -37,7 +37,7 @@ from numba import guvectorize, float64
 from mpi4py import MPI
 
 import sys
-sys.path.insert(0, '/home/hugh/dev/miind/build/libs/PythonWrapper')
+sys.path.insert(0, '/home/csunix/sc16ho/dev/miind/build/libs/PythonWrapper')
 
 import libmiindpw
 
@@ -55,7 +55,7 @@ class MiindLif(ModelNumbaDfun):
     _ui_name = "Wilson-Cowan (MIIND)"
     ui_configurable_parameters = ['c_ee', 'c_ei', 'c_ie', 'c_ii', 'tau_e', 'tau_i',
                                   'r_e',  'r_i',  'k_e',  'k_i',  'P',  'Q',
-                                  'theta_e', 'theta_i', 'alpha_e', 'alpha_i']
+                                  'b_e', 'b_i', 'a_e', 'a_i']
 
     # Define traited attributes for this model, these represent possible kwargs.
     c_ee = arrays.FloatArray(
@@ -100,18 +100,19 @@ class MiindLif(ModelNumbaDfun):
         doc="""Inhibitory population, membrane time-constant [ms]""",
         order=6)
 
-    theta_e = arrays.FloatArray(
-        label=r":math:`\theta_e`",
-        default=numpy.array([0.0]),
-        range=basic.Range(lo=0.0, hi=60., step=0.01),
-        doc="""Excitatory threshold""",
+    b_e = arrays.FloatArray(
+        label=":math:`b_e`",
+        default=numpy.array([2.8]),
+        range=basic.Range(lo=1.4, hi=6.0, step=0.01),
+        doc="""Position of the maximum slope of the excitatory sigmoid function""",
         order=7)
 
-    theta_i = arrays.FloatArray(
-        label=r":math:`\theta_i`",
-        default=numpy.array([0.0]),
-        range=basic.Range(lo=0.0, hi=60.0, step=0.01),
-        doc="""Inhibitory threshold""",
+    b_i = arrays.FloatArray(
+        label=r":math:`b_i`",
+        default=numpy.array([4.0]),
+        range=basic.Range(lo=2.0, hi=6.0, step=0.01),
+        doc="""Position of the maximum slope of a sigmoid function [in
+        threshold units]""",
         order=8)
 
     r_e = arrays.FloatArray(
@@ -158,20 +159,18 @@ class MiindLif(ModelNumbaDfun):
         Constant intensity.Entry point for coupling.""",
         order=14)
 
-    alpha_e = arrays.FloatArray(
-        label=r":math:`\alpha_e`",
-        default=numpy.array([1.0]),
-        range=basic.Range(lo=0.0, hi=20.0, step=0.01),
-        doc="""External stimulus to the excitatory population.
-        Constant intensity.Entry point for coupling.""",
+    a_e = arrays.FloatArray(
+        label=":math:`a_e`",
+        default=numpy.array([1.2]),
+        range=basic.Range(lo=0.0, hi=1.4, step=0.01),
+        doc="""The slope parameter for the excitatory response function""",
         order=15)
 
-    alpha_i = arrays.FloatArray(
-        label=r":math:`\alpha_i`",
+    a_i = arrays.FloatArray(
+        label=":math:`a_i`",
         default=numpy.array([1.0]),
-        range=basic.Range(lo=0.0, hi=20.0, step=0.01),
-        doc="""External stimulus to the inhibitory population.
-        Constant intensity.Entry point for coupling.""",
+        range=basic.Range(lo=0.0, hi=2.0, step=0.01),
+        doc="""The slope parameter for the inhibitory response function""",
         order=16)
 
     # Used for phase-plane axis ranges and to bound random initial() conditions.
@@ -201,22 +200,35 @@ class MiindLif(ModelNumbaDfun):
     _nvar = 2
     cvar = numpy.array([0, 1], dtype=numpy.int32)
 
-    def __init__(self, num_nodes):
+    def __init__(self, num_nodes, simulation_length, dt, initial_values):
         self.number_of_nodes = num_nodes
-        self.wrapped = libmiindpw.Wrapped()
+        self.simulation_length = simulation_length
+        self.wrapped = libmiindpw.Wrapped(num_nodes, simulation_length, dt)
+        self.wrapped.setInitialValues(initial_values[0].tolist(), initial_values[1].tolist())
 
     def configure(self):
         """  """
         super(MiindLif, self).configure()
         self.update_derived_parameters()
-    	self.wrapped.init(self.number_of_nodes, [self.c_ee[0], self.c_ie[0],
-        self.c_ei[0], self.c_ii[0], self.tau_e[0], self.tau_i[0], self.k_e[0], self.k_i[0],
-        self.r_e[0], self.r_i[0], self.alpha_e[0], self.alpha_i[0], self.theta_e[0],
-        self.theta_i[0], self.P[0], self.Q[0]])
-	self.wrapped.startSimulation()
+
+        # Pass all parameters to the MIIND model
+    	self.wrapped.init([self.c_ee[0], self.c_ei[0],
+        self.c_ie[0], self.c_ii[0], self.tau_e[0], self.tau_i[0], self.k_e[0], self.k_i[0],
+        self.r_e[0], self.r_i[0], self.a_e[0], self.a_i[0], self.b_e[0],
+        self.b_i[0], self.P[0], self.Q[0]])
+        if MPI.COMM_WORLD.Get_rank() == 0 :
+            # This is the main MPI process to actually perform the TVB simulation
+            # so set up the simulation ready for stepping with dfun
+            self.wrapped.startSimulation()
+        else :
+            # This is a child MPI process so just start evolving immediately.
+            # It is expected that simulator() is only called in rank 0
+            self.wrapped.evolve()
 
     def dfun(self, x, c, local_coupling=0.0):
-
+        if MPI.COMM_WORLD.Get_rank() != 0 :
+            raise Exception('TVB Simulator must only be run in master MPI process (Rank = 0). \
+            Did you call simulator() in a child process?')
         E = x[0, :]
         I = x[1, :]
 
@@ -231,11 +243,8 @@ class MiindLif(ModelNumbaDfun):
         coupling_E = c_0 + lc_0 + lc_1
         coupling_I = lc_0 + lc_1
 
-        x_ = numpy.row_stack((E,I))[:,0]
         c_ = numpy.row_stack((coupling_E, coupling_I))[:,0]
 
     	x_ = numpy.array(self.wrapped.evolveSingleStep(c_.tolist()))
 
-        x_ = numpy.reshape(x_, x.shape)
-
-        return x_
+        return numpy.reshape(x_, x.shape)
