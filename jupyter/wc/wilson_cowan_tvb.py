@@ -8,10 +8,10 @@ reload(models)
 white_matter = connectivity.Connectivity(load_default=True)
 white_matter.speed = numpy.array([4.0])
 
-oscilator = models.MiindLif(76)
+oscilator = models.WilsonCowan()
 
 white_matter_coupling = coupling.Linear(a=0.0154)
-heunint = integrators.Identity()
+heunint = integrators.EulerDeterministic()
 
 mon_raw = monitors.Raw()
 mon_tavg = monitors.TemporalAverage(period=2**-2)

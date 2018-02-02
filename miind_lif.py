@@ -37,71 +37,205 @@ from numba import guvectorize, float64
 from mpi4py import MPI
 
 import sys
-sys.path.insert(0, '//home/csunix/sc16ho/dev/miind/build/libs/PythonWrapper')
+sys.path.insert(0, '/home/hugh/dev/miind/build/libs/PythonWrapper')
 
 import libmiindpw
 
 
 class MiindLif(ModelNumbaDfun):
     r"""
-	<References and explanation>
+    **References**:
+
+    .. [WC_1972] Wilson, H.R. and Cowan, J.D. *Excitatory and inhibitory
+        interactions in localized populations of model neurons*, Biophysical
+        journal, 12: 1-24, 1972.
+
     """
-    _ui_name = "MIIND LIF"
-    ui_configurable_parameters = ['I_o']
 
-    #Define traited attributes for this model, these represent possible kwargs.
+    _ui_name = "Wilson-Cowan (MIIND)"
+    ui_configurable_parameters = ['c_ee', 'c_ei', 'c_ie', 'c_ii', 'tau_e', 'tau_i',
+                                  'r_e',  'r_i',  'k_e',  'k_i',  'P',  'Q',
+                                  'theta_e', 'theta_i', 'alpha_e', 'alpha_i']
 
-    I_o = arrays.FloatArray(
-        label=":math:`I_{o}`",
-        default=numpy.array([0.33, ]),
-        range=basic.Range(lo=0.0, hi=1.0, step=0.01),
-        doc="""[nA] Effective external input""",
+    # Define traited attributes for this model, these represent possible kwargs.
+    c_ee = arrays.FloatArray(
+        label=":math:`c_{ee}`",
+        default=numpy.array([12.0]),
+        range=basic.Range(lo=11.0, hi=16.0, step=0.01),
+        doc="""Excitatory to excitatory  coupling coefficient""",
         order=1)
 
-    #sigma_noise = arrays.FloatArray(
-    #    label=r":math:`\sigma_{noise}`",
-    #    default=numpy.array([0.000000001, ]),
-    #    range=basic.Range(lo=0.0, hi=0.005),
-    #    doc="""[nA] Noise amplitude. Take this value into account for stochatic
-    #    integration schemes.""",
-    #    order=-1)
+    c_ie = arrays.FloatArray(
+        label=":math:`c_{ei}`",
+        default=numpy.array([4.0]),
+        range=basic.Range(lo=2.0, hi=15.0, step=0.01),
+        doc="""Inhibitory to excitatory coupling coefficient""",
+        order=2)
 
+    c_ei = arrays.FloatArray(
+        label=":math:`c_{ie}`",
+        default=numpy.array([13.0]),
+        range=basic.Range(lo=2.0, hi=22.0, step=0.01),
+        doc="""Excitatory to inhibitory coupling coefficient.""",
+        order=3)
+
+    c_ii = arrays.FloatArray(
+        label=":math:`c_{ii}`",
+        default=numpy.array([11.0]),
+        range=basic.Range(lo=2.0, hi=15.0, step=0.01),
+        doc="""Inhibitory to inhibitory coupling coefficient.""",
+        order=4)
+
+    tau_e = arrays.FloatArray(
+        label=r":math:`\tau_e`",
+        default=numpy.array([10.0]),
+        range=basic.Range(lo=0.0, hi=150.0, step=0.01),
+        doc="""Excitatory population, membrane time-constant [ms]""",
+        order=5)
+
+    tau_i = arrays.FloatArray(
+        label=r":math:`\tau_i`",
+        default=numpy.array([10.0]),
+        range=basic.Range(lo=0.0, hi=150.0, step=0.01),
+        doc="""Inhibitory population, membrane time-constant [ms]""",
+        order=6)
+
+    theta_e = arrays.FloatArray(
+        label=r":math:`\theta_e`",
+        default=numpy.array([0.0]),
+        range=basic.Range(lo=0.0, hi=60., step=0.01),
+        doc="""Excitatory threshold""",
+        order=7)
+
+    theta_i = arrays.FloatArray(
+        label=r":math:`\theta_i`",
+        default=numpy.array([0.0]),
+        range=basic.Range(lo=0.0, hi=60.0, step=0.01),
+        doc="""Inhibitory threshold""",
+        order=8)
+
+    r_e = arrays.FloatArray(
+        label=":math:`r_e`",
+        default=numpy.array([1.0]),
+        range=basic.Range(lo=0.5, hi=2.0, step=0.01),
+        doc="""Excitatory refractory period""",
+        order=9)
+
+    r_i = arrays.FloatArray(
+        label=":math:`r_i`",
+        default=numpy.array([1.0]),
+        range=basic.Range(lo=0.5, hi=2.0, step=0.01),
+        doc="""Inhibitory refractory period""",
+        order=10)
+
+    k_e = arrays.FloatArray(
+        label=":math:`k_e`",
+        default=numpy.array([1.0]),
+        range=basic.Range(lo=0.5, hi=2.0, step=0.01),
+        doc="""Maximum value of the excitatory response function""",
+        order=11)
+
+    k_i = arrays.FloatArray(
+        label=":math:`k_i`",
+        default=numpy.array([1.0]),
+        range=basic.Range(lo=0.0, hi=2.0, step=0.01),
+        doc="""Maximum value of the inhibitory response function""",
+        order=12)
+
+    P = arrays.FloatArray(
+        label=":math:`P`",
+        default=numpy.array([0.0]),
+        range=basic.Range(lo=0.0, hi=20.0, step=0.01),
+        doc="""External stimulus to the excitatory population.
+        Constant intensity.Entry point for coupling.""",
+        order=13)
+
+    Q = arrays.FloatArray(
+        label=":math:`Q`",
+        default=numpy.array([0.0]),
+        range=basic.Range(lo=0.0, hi=20.0, step=0.01),
+        doc="""External stimulus to the inhibitory population.
+        Constant intensity.Entry point for coupling.""",
+        order=14)
+
+    alpha_e = arrays.FloatArray(
+        label=r":math:`\alpha_e`",
+        default=numpy.array([1.0]),
+        range=basic.Range(lo=0.0, hi=20.0, step=0.01),
+        doc="""External stimulus to the excitatory population.
+        Constant intensity.Entry point for coupling.""",
+        order=15)
+
+    alpha_i = arrays.FloatArray(
+        label=r":math:`\alpha_i`",
+        default=numpy.array([1.0]),
+        range=basic.Range(lo=0.0, hi=20.0, step=0.01),
+        doc="""External stimulus to the inhibitory population.
+        Constant intensity.Entry point for coupling.""",
+        order=16)
+
+    # Used for phase-plane axis ranges and to bound random initial() conditions.
     state_variable_range = basic.Dict(
-        label="State variable ranges [lo, hi]",
-        default={"S": numpy.array([0.0, 1.0])},
-        doc="Population firing rate",
-        order=2
-    )
+        label="State Variable ranges [lo, hi]",
+        default={"E": numpy.array([0.0, 1.0]),
+                 "I": numpy.array([0.0, 1.0])},
+        doc="""The values for each state-variable should be set to encompass
+        the expected dynamic range of that state-variable for the current
+        parameters, it is used as a mechanism for bounding random inital
+        conditions when the simulation isn't started from an explicit history,
+        it is also provides the default range of phase-plane plots.""",
+        order=17)
 
     variables_of_interest = basic.Enumerate(
         label="Variables watched by Monitors",
-        options=["S"],
-        default=["S"],
+        options=["E", "I", "E + I", "E - I"],
+        default=["E"],
         select_multiple=True,
-        doc="""default state variables to be monitored""",
-        order=10)
+        doc="""This represents the default state-variables of this Model to be
+               monitored. It can be overridden for each Monitor if desired. The
+               corresponding state-variable indices for this model are :math:`E = 0`
+               and :math:`I = 1`.""",
+        order=18)
 
-    state_variables = ['S']
-    _nvar = 1
-    cvar = numpy.array([0], dtype=numpy.int32)
+    state_variables = 'E I'.split()
+    _nvar = 2
+    cvar = numpy.array([0, 1], dtype=numpy.int32)
 
     def __init__(self, num_nodes):
         self.number_of_nodes = num_nodes
         self.wrapped = libmiindpw.Wrapped()
 
     def configure(self):
-        comm = MPI.COMM_WORLD
-        print "MASTER RANK: " + str(comm.Get_rank())
         """  """
         super(MiindLif, self).configure()
         self.update_derived_parameters()
-    	self.wrapped.init()
+    	self.wrapped.init(self.number_of_nodes, [self.c_ee[0], self.c_ie[0],
+        self.c_ei[0], self.c_ii[0], self.tau_e[0], self.tau_i[0], self.k_e[0], self.k_i[0],
+        self.r_e[0], self.r_i[0], self.alpha_e[0], self.alpha_i[0], self.theta_e[0],
+        self.theta_i[0], self.P[0], self.Q[0]])
 	self.wrapped.startSimulation()
 
     def dfun(self, x, c, local_coupling=0.0):
-        x_ = x.reshape(x.shape[:-1]).T
-        c_ = c.reshape(c.shape[:-1]).T + local_coupling * x[0]
 
-    	x_ = (numpy.array([[x] for x in self.wrapped.evolveSingleStep([x[0] for x in c_])]))
+        E = x[0, :]
+        I = x[1, :]
 
-        return x_.T[..., numpy.newaxis]
+        # long-range coupling
+        c_0 = c[0, :]
+        c_1 = numpy.zeros(c_0.shape)
+
+        # short-range (local) coupling
+        lc_0 = local_coupling * E
+        lc_1 = local_coupling * I
+
+        coupling_E = c_0 + lc_0 + lc_1
+        coupling_I = lc_0 + lc_1
+
+        x_ = numpy.row_stack((E,I))[:,0]
+        c_ = numpy.row_stack((coupling_E, coupling_I))[:,0]
+
+    	x_ = numpy.array(self.wrapped.evolveSingleStep(c_.tolist()))
+
+        x_ = numpy.reshape(x_, x.shape)
+
+        return x_
