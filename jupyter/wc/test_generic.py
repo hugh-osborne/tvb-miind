@@ -8,24 +8,18 @@ reload(models)
 white_matter = connectivity.Connectivity(load_default=True)
 white_matter.speed = numpy.array([4.0])
 
-E_init = numpy.random.rand(76)
-I_init = numpy.random.rand(76)
-inits = numpy.row_stack((E_init, I_init))
-initial_conditions = numpy.expand_dims(numpy.expand_dims(inits, axis=0), axis=3)
-
-oscilator = models.Miind_WilsonCowan(76, 10**2, 0.01, inits)
+oscilator = models.Miind('libmiindpython.so',76, 1**2, 0.000770095348827)
 
 white_matter_coupling = coupling.Linear(a=0.0154)
-heunint = integrators.Identity(dt = 0.01) # dt of the integrator should be defined to match MIIND
+heunint = integrators.Identity(dt = 0.000770095348827) # dt of the integrator should be defined to match MIIND
 
 mon_raw = monitors.Raw()
-mon_tavg = monitors.TemporalAverage(period=2**-2)
+mon_tavg = monitors.TemporalAverage(period=2**-3)
 what_to_watch = (mon_raw, mon_tavg)
 
 sim = simulator.Simulator(model = oscilator, connectivity = white_matter,
                           coupling = white_matter_coupling,
-                          integrator = heunint, monitors = what_to_watch,
-                          initial_conditions = initial_conditions)
+                          integrator = heunint, monitors = what_to_watch)
 
 sim.configure()
 
@@ -34,7 +28,7 @@ raw_time = []
 tavg_data = []
 tavg_time = []
 
-for raw, tavg in sim(simulation_length=10**2):
+for raw, tavg in sim(simulation_length=1**2):
     if not raw is None:
     	raw_time.append(raw[0])
     	raw_data.append(raw[1])
