@@ -50,5 +50,5 @@ from .linear import Linear
 from .hopfield import Hopfield
 from .epileptor import Epileptor
 from .epileptorcodim3 import EpileptorCodim3, EpileptorCodim3_slowmod
-from .Miind_WilsonCowan import Miind_WilsonCowan
+from .miind_wilson_cowan import Miind_WilsonCowan
 from .miind import Miind
