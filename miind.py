@@ -34,6 +34,8 @@ Description of models
 from .base import ModelNumbaDfun, LOG, numpy, basic, arrays
 from numba import guvectorize, float64
 
+from mpi4py import MPI
+
 import imp
 
 class Miind(ModelNumbaDfun):
@@ -62,22 +64,31 @@ class Miind(ModelNumbaDfun):
         doc="""default state variables to be monitored""",
         order=18)
 
-    state_variables = [S]
+    state_variables = ['S']
     _nvar = 1
     cvar = numpy.array([0], dtype=numpy.int32)
 
-    def __init__(self, module_name, module_path, num_nodes, simulation_length, dt):
-        miind = imp.load_source(module_name, module_path)
+    def __init__(self, module_file, num_nodes, simulation_length, dt):
+        remove_so = module_file.split('.so')
+        remove_nix_path = remove_so[0].split('/')
+        remove_win_path = remove_nix_path[-1].split('\\')
+        miind = imp.load_dynamic(remove_win_path[-1], module_file)
         self.number_of_nodes = num_nodes
         self.simulation_length = simulation_length
-        self.wrapped = miind.Wrapped(number_of_nodes, simulation_length, dt)
+        self.num_iterations = int(simulation_length / dt)
+        self.miindmodel = miind.MiindModel(num_nodes, simulation_length, dt)
 
     def configure(self):
         """  """
-        super(MiindLif, self).configure()
+        super(Miind, self).configure()
         self.update_derived_parameters()
-    	self.wrapped.init()
-	self.wrapped.startSimulation()
+    	self.miindmodel.init()
+        self.miindmodel.startSimulation()
+        if MPI.COMM_WORLD.Get_rank() > 0:
+            for i in range(self.num_iterations):
+                self.miindmodel.evolveSingleStep([])
+            quit()
+
 
     def dfun(self, x, c, local_coupling=0.0):
 
@@ -93,6 +104,6 @@ class Miind(ModelNumbaDfun):
         coupling_S = c_0 + lc_0
 
         c_ = coupling_S[:,0]
-    	x_ = numpy.array(self.wrapped.evolveSingleStep(c_.tolist()))
+    	x_ = numpy.array(self.miindmodel.evolveSingleStep(c_.tolist()))
 
         return numpy.reshape(x_, x.shape)
