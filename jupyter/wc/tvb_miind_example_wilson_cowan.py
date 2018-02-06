@@ -16,6 +16,7 @@ white_matter.speed = numpy.array([4.0])
 # Currently, the Connectivity.number_of_regions is unavailable when loaded from
 # a source file (as with the default) so we manually set 76 here
 # Alternatively, len(Connectivity.region_labels) can be used.
+numpy.random.seed(0)
 E_init = numpy.random.rand(76)
 I_init = numpy.random.rand(76)
 inits = numpy.row_stack((E_init, I_init))
