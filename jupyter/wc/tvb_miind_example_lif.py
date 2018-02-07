@@ -3,6 +3,8 @@ import numpy
 import matplotlib.pyplot as plt
 
 from tvb.simulator.lab import *
+reload(models)
+reload(simulator)
 
 # The library libmiindlif.so was built to run as an MPI process and
 # expects MPI_Init to have been called (which happens during the import here)
@@ -10,7 +12,7 @@ from mpi4py import MPI
 comm = MPI.COMM_WORLD
 
 time_step = 0.000770095348827 # ms
-simulation_length = 1**2 # ms
+simulation_length = 1**3 # ms
 
 # Only the master MPI process (rank=0) will implement the TVB simulation. All
 # other processes need only instantiate the Miind model and call configure()
@@ -41,7 +43,7 @@ if comm.Get_rank() == 0 :
     integrator = integrators.Identity(dt = time_step)
 
     mon_raw = monitors.Raw()
-    mon_tavg = monitors.TemporalAverage(period=2**-3)
+    mon_tavg = monitors.TemporalAverage(period=time_step*20)
     what_to_watch = (mon_raw, mon_tavg)
 
     sim = simulator.Simulator(model = model, connectivity = white_matter,
@@ -68,11 +70,15 @@ if comm.Get_rank() == 0 :
 
     plt.figure(1)
     plt.plot(raw_time, RAW[:, 0, :, 0])
-    plt.title("Raw -- State variable 0")
+    plt.title("Simple LIF Neuron Population Mean Firing Rate \nUsing the MIIND Adapter model in TVB")
+    plt.ylabel("Firing Rate (Hz)")
+    plt.xlabel("Time (s)")
 
     plt.figure(2)
     plt.plot(tavg_time, TAVG[:, 0, :, 0])
-    plt.title("Temporal average")
+    plt.title("Simple LIF Neuron Population Mean Firing Rate \nUsing the MIIND Adapter model in TVB (Time Averaged)")
+    plt.ylabel("Firing Rate (Hz)")
+    plt.xlabel("Time (s)")
 
     plt.show()
 else :
