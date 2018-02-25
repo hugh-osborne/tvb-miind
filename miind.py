@@ -91,7 +91,7 @@ class Miind(ModelNumbaDfun):
     _nvar = 1
     cvar = numpy.array([0], dtype=numpy.int32)
 
-    def __init__(self, module_file, num_nodes, simulation_length):
+    def __init__(self, module_file, num_nodes, simulation_length, model_params = []):
         # dynamically import the MIIND shared library
         remove_so = module_file.split('.so')
         remove_nix_path = remove_so[0].split('/')
@@ -100,12 +100,14 @@ class Miind(ModelNumbaDfun):
         self.number_of_nodes = num_nodes
         self.simulation_length = simulation_length
         self.miindmodel = miind.MiindModel(num_nodes, simulation_length)
+	self.model_parameters = model_params
+	
 
     def configure(self):
         """  """
         super(Miind, self).configure()
         self.update_derived_parameters()
-    	self.miindmodel.init()
+    	self.miindmodel.init(self.model_parameters)
         # For MPI child processes, startSimulation runs the full simulation loop
         # and so will not return until MPI process 0 has completed. At that point,
         # we want to kill the child processes so that sim() is not called more than once.

@@ -34,8 +34,7 @@ MIIND implementation of Wilson-Cowan
 from .base import ModelNumbaDfun, LOG, numpy, basic, arrays
 from numba import guvectorize, float64
 
-import libmiindwc
-
+import miindTVBlibs
 
 class Miind_WilsonCowan(ModelNumbaDfun):
     r"""
@@ -226,7 +225,8 @@ class Miind_WilsonCowan(ModelNumbaDfun):
         self.number_of_nodes = num_nodes
         self.simulation_length = simulation_length
         self.num_iterations = int(simulation_length / dt)
-        self.miindmodel = libmiindwc.MiindWilsonCowan(num_nodes, simulation_length, dt)
+
+        self.miindmodel = miindTVBlibs.libmiindwc.MiindWilsonCowan(num_nodes, simulation_length, dt)
         self.miindmodel.setInitialValues(initial_values[0].tolist(), initial_values[1].tolist())
 
     def configure(self):
