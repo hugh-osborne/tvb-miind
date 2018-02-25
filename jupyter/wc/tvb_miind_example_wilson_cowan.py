@@ -39,7 +39,8 @@ integrator = integrators.Identity(dt = 0.01)
 #integrator = integrators.EulerDeterministic()
 
 mon_raw = monitors.Raw()
-what_to_watch = (mon_raw)
+mon_tavg = monitors.TemporalAverage(period=2**-2)
+what_to_watch = (mon_raw, mon_tavg)
 
 sim = simulator.Simulator(model = model, connectivity = white_matter,
                           coupling = white_matter_coupling,
@@ -50,18 +51,23 @@ sim.configure()
 
 raw_data = []
 raw_time = []
+tavg_data = []
+tavg_time = []
 
-for raw in sim(simulation_length=10**2):
+for raw, tavg in sim(simulation_length=10**2):
     if not raw is None:
     	raw_time.append(raw[0])
     	raw_data.append(raw[1])
+    if not tavg is None:
+    	tavg_time.append(tavg[0])
+    	tavg_data.append(tavg[1])
 
 RAW = numpy.array(raw_data)
+TAVG = numpy.array(tavg_data)
 
 plt.figure(1)
 plt.plot(raw_time, RAW[:, 0, :, 0])
 plt.title("Wilson-Cowan Excitatory Population Mean Firing Rate \nUsing MIIND's Wilson Cowan model in TVB")
 plt.ylabel("Firing Rate (Hz)")
 plt.xlabel("Time (ms)")
-
 plt.show()
